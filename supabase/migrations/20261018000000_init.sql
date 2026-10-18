@@ -138,11 +138,17 @@ create index on stock_movements(product_id);
 create index on transactions(tx_date);
 create index on orders(status);
 
--- Acceso: por ahora un solo usuario autenticado administra todo el negocio.
+create index on transactions(order_id);
+create index on orders(customer_id);
+create index on production_jobs(product_id);
+
+-- Acceso restringido al dueño (correo) mientras no existan roles.
 do $$ declare t text; begin
   foreach t in array array['settings','items','products','customers','orders','order_items',
                            'production_jobs','stock_movements','transactions'] loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy "auth full access" on %I for all to authenticated using (true) with check (true)', t);
+    execute format($p$create policy "owner full access" on %I for all to authenticated
+      using ((select auth.jwt() ->> 'email') = 'avilaisabel1218@gmail.com')
+      with check ((select auth.jwt() ->> 'email') = 'avilaisabel1218@gmail.com')$p$, t);
   end loop;
 end $$;

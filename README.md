@@ -15,7 +15,7 @@ npm run dev
 ## Conectar Supabase
 1. Crea un proyecto en supabase.com.
 2. Ejecuta `supabase/migrations/20261018000000_init.sql` en el SQL Editor.
-3. En Authentication → Users crea tu usuario (correo y contraseña).
+3. En Authentication → Users crea tu usuario (correo y contraseña) y desactiva "Allow new users to sign up". Las políticas RLS solo permiten el correo del dueño.
 4. Copia `.env.example` a `.env.local` y llena `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
 
 ## Modelo financiero
