@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-graphite: #2b2b2b;
+  --color-soft: #f8f7f3;
+  --color-fog: #c8cdd0;
+  --color-sand: #e7e2d8;
+  --color-sage: #9bae9d;
+  --color-sage-dark: #6f8672;
+  --color-bad: #b4533f;
+  --color-warn: #c28a2b;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+html, body { background: var(--color-soft); color: var(--color-graphite); font-family: var(--font-sans); margin: 0; }
+input, select, textarea { background: #fff; border: 1px solid var(--color-fog); border-radius: 8px; padding: 8px 10px; width: 100%; font-size: 14px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--color-sage); outline-offset: 0; border-color: var(--color-sage); }
+input[type="checkbox"] { width: auto; }
+label { font-size: 12px; font-weight: 500; color: #6b6f72; display: block; margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #6b6f72; font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--color-sand); white-space: nowrap; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--color-sand); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
