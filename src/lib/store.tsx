@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, insertRow, loadAll, removeRow, saveSettings, supabase
 import { costProduct, filamentPerGram, orderTotals, productUnitCost, sum, today } from './calc'
 import type { Data, Item, Order, OrderItem, OrderStatus, Product, ProductionJob, Settings, TableName, Transaction } from './types'
 
-const EMPTY: Data = { settings: DEFAULT_SETTINGS, items: [], products: [], customers: [], orders: [], order_items: [], production_jobs: [], stock_movements: [], transactions: [] }
+const EMPTY: Data = { settings: DEFAULT_SETTINGS, items: [], products: [], customers: [], orders: [], order_items: [], production_jobs: [], stock_movements: [], transactions: [], recurring_expenses: [] }
 
 interface Ctx {
   data: Data; loading: boolean; error: string | null; cloud: boolean
@@ -25,6 +25,32 @@ interface Ctx {
 const C = createContext<Ctx>(null as never)
 export const useStore = () => useContext(C)
 
+// Genera los cargos mensuales pendientes (renta, suscripciones…) hasta el mes actual.
+let posting = false
+async function postRecurring(d: Data): Promise<boolean> {
+  if (posting) return false
+  posting = true
+  try {
+    const now = new Date(); const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    let changed = false
+    for (const r of d.recurring_expenses.filter(x => x.active)) {
+      let [y, m] = (r.last_generated ?? '').length ? r.last_generated!.split('-').map(Number) : [0, 0]
+      let next = r.last_generated ? (m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`) : r.start_month
+      let last = r.last_generated ?? null
+      while (next <= cur) {
+        const date = `${next}-${String(r.day_of_month).padStart(2, '0')}`
+        if (date > today()) break
+        await insertRow('transactions', { tx_date: date, type: 'egreso', category: r.category, amount: r.amount, iva_included: r.iva_included, account: r.account, description: `${r.name} (recurrente)` })
+        last = next; changed = true
+        ;[y, m] = next.split('-').map(Number)
+        next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
+      }
+      if (last !== r.last_generated) await updateRow('recurring_expenses', r.id, { last_generated: last })
+    }
+    return changed
+  } finally { posting = false }
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Data>(EMPTY)
   const [loading, setLoading] = useState(true)
@@ -32,7 +58,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState(!isCloud)
 
   const reload = useCallback(async () => {
-    try { setData(await loadAll()); setError(null) } catch (e) { setError((e as Error).message) } finally { setLoading(false) }
+    try {
+      let d = await loadAll()
+      if (await postRecurring(d)) d = await loadAll()
+      setData(d); setError(null)
+    } catch (e) { setError((e as Error).message) } finally { setLoading(false) }
   }, [])
 
   useEffect(() => {

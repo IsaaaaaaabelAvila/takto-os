@@ -27,8 +27,10 @@ export interface ProductionJob {
 export interface StockMovement { id: string; item_id?: string|null; product_id?: string|null; qty: number; reason: 'compra'|'produccion'|'venta'|'merma'|'ajuste'|'devolucion'; ref?: string|null; move_date: string }
 export interface Transaction { id: string; tx_date: string; type: 'ingreso'|'egreso'; category: string; amount: number; iva_included: boolean; account: string; description?: string|null; order_id?: string|null }
 
+export interface RecurringExpense { id: string; name: string; category: string; amount: number; iva_included: boolean; account: string; day_of_month: number; start_month: string; last_generated?: string|null; active: boolean }
+
 export interface Data {
   settings: Settings; items: Item[]; products: Product[]; customers: Customer[]; orders: Order[]
-  order_items: OrderItem[]; production_jobs: ProductionJob[]; stock_movements: StockMovement[]; transactions: Transaction[]
+  order_items: OrderItem[]; production_jobs: ProductionJob[]; stock_movements: StockMovement[]; transactions: Transaction[]; recurring_expenses: RecurringExpense[]
 }
 export type TableName = Exclude<keyof Data, 'settings'>

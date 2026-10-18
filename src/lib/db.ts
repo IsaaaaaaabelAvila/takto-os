@@ -12,7 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   target_margin: 0.5, monthly_revenue_goal: 20000, monthly_fixed_costs: 3000, opening_cash: 0,
 }
 
-const TABLES: TableName[] = ['items','products','customers','orders','order_items','production_jobs','stock_movements','transactions']
+const TABLES: TableName[] = ['items','products','customers','orders','order_items','production_jobs','stock_movements','transactions','recurring_expenses']
 const LS = 'takto-os:'
 const uid = () => crypto.randomUUID()
 
