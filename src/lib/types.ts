@@ -6,7 +6,7 @@ export interface Settings {
 }
 export interface Item { id: string; kind: 'filamento'|'empaque'|'componente'|'otro'; name: string; color?: string|null; unit: string; unit_cost: number; reorder_point: number; active: boolean }
 export interface Product {
-  id: string; sku?: string|null; line?: string|null; name: string; price: number; batch_units: number
+  id: string; sku?: string|null; line?: string|null; name: string; price: number; price_kubux: number; batch_units: number
   grams_per_batch: number; print_minutes_per_batch: number; colors: number
   labor_minutes_per_batch: number; other_cost_per_batch: number; reorder_point: number; active: boolean
 }

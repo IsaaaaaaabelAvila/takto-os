@@ -6,7 +6,7 @@ import { Badge, Btn, Card, Empty, Field, Modal, PageHeader, STATUS_LABEL } from 
 import type { Order, OrderStatus } from '../lib/types'
 
 const FLOW: OrderStatus[] = ['cotizacion', 'confirmado', 'produccion', 'listo', 'enviado', 'entregado']
-const CHANNELS = ['directo', 'instagram', 'tienda_online', 'mercado_libre', 'evento', 'mayoreo']
+const CHANNELS = ['directo', 'kubux', 'instagram', 'tienda_online', 'mercado_libre', 'evento', 'mayoreo']
 
 interface Line { product_id: string | null; description: string; qty: number; unit_price: number; unit_cost: number }
 
@@ -20,9 +20,14 @@ function NewOrder({ onClose }: { onClose: () => void }) {
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<Line[]>([{ product_id: null, description: '', qty: 1, unit_price: 0, unit_cost: 0 }])
 
+  const priceFor = (p: { price: number; price_kubux: number }, ch: string) => (ch === 'kubux' ? p.price_kubux || p.price : p.price || p.price_kubux)
+  const changeChannel = (ch: string) => {
+    setChannel(ch)
+    setLines(ls => ls.map(l => { const p = data.products.find(x => x.id === l.product_id); return p ? { ...l, unit_price: priceFor(p, ch) } : l }))
+  }
   const pick = (i: number, pid: string) => {
     const p = data.products.find(x => x.id === pid)
-    setLines(ls => ls.map((l, j) => j !== i ? l : p ? { product_id: p.id, description: p.name, qty: l.qty, unit_price: p.price, unit_cost: Math.round(costProduct(p, data.settings, gram).unitCost * 100) / 100 } : { ...l, product_id: null }))
+    setLines(ls => ls.map((l, j) => j !== i ? l : p ? { product_id: p.id, description: p.name, qty: l.qty, unit_price: priceFor(p, channel), unit_cost: Math.round(costProduct(p, data.settings, gram).unitCost * 100) / 100 } : { ...l, product_id: null }))
   }
   const upd = (i: number, patch: Partial<Line>) => setLines(ls => ls.map((l, j) => j === i ? { ...l, ...patch } : l))
   const gross = Math.max(0, lines.reduce((a, l) => a + l.qty * l.unit_price, 0) - discount + shipC)
@@ -47,7 +52,7 @@ function NewOrder({ onClose }: { onClose: () => void }) {
           </select>
         </Field>
         <Field label="…o nombre de cliente nuevo"><input value={newCustomer} onChange={e => setNewCustomer(e.target.value)} disabled={!!customer} /></Field>
-        <Field label="Canal"><select value={channel} onChange={e => setChannel(e.target.value)}>{CHANNELS.map(c => <option key={c}>{c}</option>)}</select></Field>
+        <Field label="Canal"><select value={channel} onChange={e => changeChannel(e.target.value)}>{CHANNELS.map(c => <option key={c}>{c}</option>)}</select></Field>
         <Field label="Estado inicial"><select value={status} onChange={e => setStatus(e.target.value as OrderStatus)}>{FLOW.slice(0, 3).map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
         <Field label="Fecha de entrega prometida"><input type="date" value={due} onChange={e => setDue(e.target.value)} /></Field>
       </div>

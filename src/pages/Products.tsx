@@ -5,7 +5,7 @@ import { costProduct, filamentPerGram, money, pct } from '../lib/calc'
 import { Btn, Card, Empty, Field, Modal, PageHeader } from '../components/ui'
 import type { Product } from '../lib/types'
 
-const BLANK: Omit<Product, 'id'> = { sku: '', line: '', name: '', price: 0, batch_units: 1, grams_per_batch: 0, print_minutes_per_batch: 0, colors: 1, labor_minutes_per_batch: 0, other_cost_per_batch: 0, reorder_point: 0, active: true }
+const BLANK: Omit<Product, 'id'> = { sku: '', line: '', name: '', price: 0, price_kubux: 0, batch_units: 1, grams_per_batch: 0, print_minutes_per_batch: 0, colors: 1, labor_minutes_per_batch: 0, other_cost_per_batch: 0, reorder_point: 0, active: true }
 const TIERS = [0.1, 0.15, 0.25, 0.5, 0.75]
 
 function Editor({ product, onClose }: { product?: Product; onClose: () => void }) {
@@ -16,6 +16,8 @@ function Editor({ product, onClose }: { product?: Product; onClose: () => void }
   const c = costProduct({ id: '', ...f }, s, gram)
   const net = f.price / (1 + s.iva_rate)
   const margin = net > 0 ? (net - c.unitCost) / net : 0
+  const kNet = f.price_kubux / (1 + s.iva_rate)
+  const kMargin = kNet > 0 ? (kNet - c.unitCost) / kNet : 0
   const suggestedNet = c.unitCost / (1 - s.target_margin)
   const rows: [string, number][] = [['Filamento (con merma)', c.filament], ['Energía', c.energy], ['Máquina / desgaste', c.machine], ['Mano de obra', c.labor], ['Otros (empaque, etc.)', c.other]]
 
@@ -31,7 +33,8 @@ function Editor({ product, onClose }: { product?: Product; onClose: () => void }
         <Field label="Colores"><input type="number" min={1} value={f.colors} onChange={e => set('colors', +e.target.value)} /></Field>
         <Field label="Minutos de mano de obra / lote"><input type="number" value={f.labor_minutes_per_batch} onChange={e => set('labor_minutes_per_batch', +e.target.value)} /></Field>
         <Field label="Otros costos por lote"><input type="number" value={f.other_cost_per_batch} onChange={e => set('other_cost_per_batch', +e.target.value)} /></Field>
-        <Field label="Precio de venta (c/IVA)"><input type="number" value={f.price} onChange={e => set('price', +e.target.value)} /></Field>
+        <Field label="Precio directo / B2B (c/IVA)"><input type="number" value={f.price} onChange={e => set('price', +e.target.value)} /></Field>
+        <Field label="Precio Kubux (c/IVA)"><input type="number" value={f.price_kubux} onChange={e => set('price_kubux', +e.target.value)} /></Field>
         <Field label="Punto de reorden (pzas)"><input type="number" value={f.reorder_point} onChange={e => set('reorder_point', +e.target.value)} /></Field>
       </div>
 
@@ -44,7 +47,8 @@ function Editor({ product, onClose }: { product?: Product; onClose: () => void }
         </div>
         <div className="bg-white border border-sand rounded-lg p-4 text-sm">
           <div className="font-semibold mb-2">Rentabilidad</div>
-          <div className="flex justify-between py-0.5"><span className="text-[#6b6f72]">Precio neto (sin IVA)</span><span>{money(net)}</span></div>
+          <div className="flex justify-between py-0.5"><span className="text-[#6b6f72]">Margen precio Kubux</span><b className={kMargin < s.target_margin ? 'text-warn' : 'text-sage-dark'}>{f.price_kubux ? pct(kMargin) : '—'}</b></div>
+          <div className="flex justify-between py-0.5"><span className="text-[#6b6f72]">Precio directo neto (sin IVA)</span><span>{money(net)}</span></div>
           <div className="flex justify-between py-0.5"><span className="text-[#6b6f72]">Utilidad por pieza</span><span className={net - c.unitCost < 0 ? 'text-bad' : ''}>{money(net - c.unitCost)}</span></div>
           <div className="flex justify-between py-0.5"><span className="text-[#6b6f72]">Margen</span><b className={margin < s.target_margin ? 'text-warn' : 'text-sage-dark'}>{pct(margin)}</b></div>
           <div className="flex justify-between py-0.5"><span className="text-[#6b6f72]">Precio sugerido p/ margen {pct(s.target_margin)}</span><b>{money(suggestedNet * (1 + s.iva_rate))}</b></div>
@@ -72,15 +76,16 @@ export default function Products() {
       <Card className="overflow-x-auto !p-0">
         {data.products.length === 0 ? <Empty>Sin productos. Importa tu catálogo desde Ajustes o crea uno nuevo.</Empty> : (
           <table>
-            <thead><tr><th>Línea</th><th>Producto</th><th className="num">Lote</th><th className="num">Costo/pza</th><th className="num">Precio</th><th className="num">Precio neto</th><th className="num">Utilidad/pza</th><th className="num">Margen</th></tr></thead>
+            <thead><tr><th>Línea</th><th>Producto</th><th className="num">Lote</th><th className="num">Costo/pza</th><th className="num">Precio directo</th><th className="num">Margen</th><th className="num">Precio Kubux</th><th className="num">Margen</th></tr></thead>
             <tbody>{data.products.map(p => {
-              const c = costProduct(p, data.settings, gram); const net = p.price / (1 + data.settings.iva_rate); const m = net ? (net - c.unitCost) / net : 0
+              const c = costProduct(p, data.settings, gram); const net = p.price / (1 + data.settings.iva_rate); const m = net ? (net - c.unitCost) / net : 0; const kn = p.price_kubux / (1 + data.settings.iva_rate); const km = kn ? (kn - c.unitCost) / kn : 0
               return (
                 <tr key={p.id} className="cursor-pointer hover:bg-sand/30" onClick={() => setEd({ p })}>
                   <td className="text-xs text-[#6b6f72]">{p.line}</td><td className="font-medium">{p.name}</td><td className="num">{p.batch_units}</td>
-                  <td className="num">{money(c.unitCost)}</td><td className="num">{money(p.price)}</td><td className="num">{money(net)}</td>
-                  <td className={`num ${net - c.unitCost < 0 ? 'text-bad' : ''}`}>{money(net - c.unitCost)}</td>
-                  <td className={`num font-medium ${m < data.settings.target_margin ? 'text-warn' : 'text-sage-dark'}`}>{pct(m)}</td>
+                  <td className="num">{money(c.unitCost)}</td><td className="num">{p.price ? money(p.price) : '—'}</td>
+                  <td className={`num font-medium ${m < data.settings.target_margin ? 'text-warn' : 'text-sage-dark'}`}>{p.price ? pct(m) : '—'}</td>
+                  <td className="num">{p.price_kubux ? money(p.price_kubux) : '—'}</td>
+                  <td className={`num font-medium ${km < data.settings.target_margin ? 'text-warn' : 'text-sage-dark'}`}>{p.price_kubux ? pct(km) : '—'}</td>
                 </tr>
               )
             })}</tbody>
