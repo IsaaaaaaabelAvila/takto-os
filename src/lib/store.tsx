@@ -40,8 +40,9 @@ async function postRecurring(d: Data): Promise<boolean> {
       while (next <= cur) {
         const date = `${next}-${String(r.day_of_month).padStart(2, '0')}`
         if (date > today()) break
-        await insertRow('transactions', { tx_date: date, type: 'egreso', category: r.category, amount: r.amount, iva_included: r.iva_included, account: r.account, description: `${r.name} (recurrente)` })
-        last = next; changed = true
+        // índice único (recurring_id, recurring_month): si otra pestaña ya lo generó, se ignora el duplicado
+        try { await insertRow('transactions', { tx_date: date, type: 'egreso', category: r.category, amount: r.amount, iva_included: r.iva_included, account: r.account, description: `${r.name} (recurrente)`, recurring_id: r.id, recurring_month: next }); changed = true } catch { /* ya existe */ }
+        last = next
         ;[y, m] = next.split('-').map(Number)
         next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
       }
