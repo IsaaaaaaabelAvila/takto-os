@@ -25,7 +25,17 @@ export const CATEGORIES: { name: string; type: 'ingreso' | 'egreso'; group: stri
   { name: 'Impuestos (SAT)', type: 'egreso', group: 'impuestos', iva: false },
   { name: 'Retiro del dueño', type: 'egreso', group: 'capital', iva: false },
   { name: 'Pago de préstamo', type: 'egreso', group: 'capital', iva: false },
+  { name: 'Reembolso a socio', type: 'egreso', group: 'reembolso', iva: false },
 ]
+// Gastos que un socio pagó de su bolsa: son gasto del negocio (estado de resultados) pero no mueven el efectivo
+// de la empresa hasta que se le reembolsa (cuenta "socio"). Mientras tanto son una deuda con el socio.
+export const PARTNER_ACCOUNT = 'socio'
+const inCash = (t: Transaction) => t.account !== PARTNER_ACCOUNT
+export function partnerDebt(d: Data) {
+  const spent = sum(d.transactions.filter(t => t.account === PARTNER_ACCOUNT && t.type === 'egreso').map(t => t.amount))
+  const repaid = sum(d.transactions.filter(t => t.category === 'Reembolso a socio').map(t => t.amount))
+  return { spent, repaid, owed: Math.max(0, spent - repaid) }
+}
 export const groupOf = (cat: string) => CATEGORIES.find(c => c.name === cat)?.group ?? 'opex'
 
 // ---------- Costeo (replica y extiende la hoja TAKTO_COSTEO) ----------
@@ -119,7 +129,7 @@ export function pnl(d: Data, from: string, to: string): PnL {
 }
 
 export function cashFlow(d: Data, from: string, to: string) {
-  const tx = d.transactions.filter(t => t.tx_date >= from && t.tx_date <= to)
+  const tx = d.transactions.filter(t => t.tx_date >= from && t.tx_date <= to && inCash(t))
   const g = (type: string, grp: string) => sum(tx.filter(t => t.type === type && groupOf(t.category) === grp).map(t => t.amount))
   const inflow = sum(tx.filter(t => t.type === 'ingreso').map(t => t.amount))
   const outflow = sum(tx.filter(t => t.type === 'egreso').map(t => t.amount))
@@ -127,11 +137,11 @@ export function cashFlow(d: Data, from: string, to: string) {
     inflow, outflow, net: inflow - outflow,
     operating: g('ingreso', 'ventas') + g('ingreso', 'otros_ing') - g('egreso', 'opex') - g('egreso', 'inventario') - g('egreso', 'impuestos'),
     investing: -g('egreso', 'capex'),
-    financing: g('ingreso', 'capital') - g('egreso', 'capital'),
+    financing: g('ingreso', 'capital') - g('egreso', 'capital') - g('egreso', 'reembolso'),
   }
 }
 export function cashBalance(d: Data, upTo = '9999-12-31') {
-  return d.settings.opening_cash + sum(d.transactions.filter(t => t.tx_date <= upTo).map(t => t.type === 'ingreso' ? t.amount : -t.amount))
+  return d.settings.opening_cash + sum(d.transactions.filter(t => t.tx_date <= upTo && inCash(t)).map(t => t.type === 'ingreso' ? t.amount : -t.amount))
 }
 export function ivaBalance(d: Data, from: string, to: string) {
   const s = d.settings

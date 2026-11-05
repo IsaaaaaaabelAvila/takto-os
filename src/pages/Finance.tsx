@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useStore } from '../lib/store'
-import { CATEGORIES, cashBalance, cashFlow, groupOf, ivaBalance, lastMonths, money, money0, monthKey, monthLabel, monthRange, receivables, sum, today } from '../lib/calc'
+import { CATEGORIES, PARTNER_ACCOUNT, partnerDebt, cashBalance, cashFlow, groupOf, ivaBalance, lastMonths, money, money0, monthKey, monthLabel, monthRange, receivables, sum, today } from '../lib/calc'
 import { Badge, Btn, Card, Empty, Field, Modal, PageHeader, Stat } from '../components/ui'
 import type { RecurringExpense, Transaction } from '../lib/types'
 
@@ -42,9 +42,9 @@ function Recurring() {
   )
 }
 
-function TxForm({ tx, onClose }: { tx?: Transaction; onClose: () => void }) {
+function TxForm({ tx, preset, onClose }: { tx?: Transaction; preset?: Partial<Transaction>; onClose: () => void }) {
   const { add, edit, del, data } = useStore()
-  const [f, setF] = useState<Omit<Transaction, 'id'>>(tx ?? { tx_date: today(), type: 'egreso', category: 'Otros gastos', amount: 0, iva_included: true, account: 'banco', description: '', order_id: null })
+  const [f, setF] = useState<Omit<Transaction, 'id'>>(tx ?? { tx_date: today(), type: 'egreso', category: 'Otros gastos', amount: 0, iva_included: true, account: 'banco', description: '', order_id: null, ...preset })
   const cats = CATEGORIES.filter(c => c.type === f.type)
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF(x => ({ ...x, [k]: v }))
   const net = f.iva_included ? f.amount / (1 + data.settings.iva_rate) : f.amount
@@ -57,8 +57,9 @@ function TxForm({ tx, onClose }: { tx?: Transaction; onClose: () => void }) {
         <Field label="Fecha"><input type="date" value={f.tx_date} onChange={e => set('tx_date', e.target.value)} /></Field>
         <Field label="Monto total"><input type="number" step="0.01" value={f.amount} onChange={e => set('amount', +e.target.value)} /></Field>
         <Field label="Categoría"><select value={f.category} onChange={e => { set('category', e.target.value); set('iva_included', CATEGORIES.find(c => c.name === e.target.value)?.iva ?? true) }}>{cats.map(c => <option key={c.name}>{c.name}</option>)}</select></Field>
-        <Field label="Cuenta"><select value={f.account} onChange={e => set('account', e.target.value)}><option>banco</option><option>efectivo</option><option>tarjeta</option></select></Field>
+        <Field label="Cuenta"><select value={f.account} onChange={e => set('account', e.target.value)}><option>banco</option><option>efectivo</option><option>tarjeta</option><option value={PARTNER_ACCOUNT}>socio (lo pagó Iván de su bolsa)</option></select></Field>
       </div>
+      {f.account === PARTNER_ACCOUNT && <p className="text-xs text-[#6b6f72] mt-2">Cuenta como gasto del negocio, pero no sale del efectivo de la empresa: queda como deuda con el socio hasta que registres el reembolso.</p>}
       <label className="flex items-center gap-2 mt-3 !text-sm"><input type="checkbox" checked={f.iva_included} onChange={e => set('iva_included', e.target.checked)} />El monto incluye IVA {f.iva_included && f.amount > 0 && <span className="text-[#6b6f72]">(base {money(net)} + IVA {money(f.amount - net)})</span>}</label>
       <Field label="Descripción" className="mt-3"><input value={f.description ?? ''} onChange={e => set('description', e.target.value)} /></Field>
       {groupOf(f.category) === 'capex' && <p className="text-xs text-[#6b6f72] mt-2">Las compras de equipo no se cargan al gasto del mes: se reflejan en el flujo de inversión y en el costo de máquina por trabajo.</p>}
@@ -74,7 +75,8 @@ function TxForm({ tx, onClose }: { tx?: Transaction; onClose: () => void }) {
 export default function Finance() {
   const { data } = useStore()
   const [tab, setTab] = useState<'mov' | 'flujo' | 'cobrar' | 'iva' | 'rec'>('mov')
-  const [month, setMonth] = useState(monthKey()); const [ed, setEd] = useState<{ tx?: Transaction } | null>(null)
+  const [month, setMonth] = useState(monthKey()); const [ed, setEd] = useState<{ tx?: Transaction; preset?: Partial<Transaction> } | null>(null)
+  const debt = partnerDebt(data)
   const [from, to] = monthRange(month)
   const txs = data.transactions.filter(t => t.tx_date >= from && t.tx_date <= to).sort((a, b) => b.tx_date.localeCompare(a.tx_date))
   const cf = cashFlow(data, from, to); const ar = receivables(data); const iva = ivaBalance(data, from, to)
@@ -91,6 +93,12 @@ export default function Finance() {
         <Stat label="Salidas del mes" value={money0(cf.outflow)} />
         <Stat label="Flujo neto del mes" value={money0(cf.net)} tone={cf.net >= 0 ? 'good' : 'bad'} />
       </div>
+      {debt.owed > 0.5 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-warn/10 border border-warn/40 rounded-lg px-4 py-3 mb-4 text-sm">
+          <div><b>Por reembolsar a socios: {money(debt.owed)}</b><span className="text-[#6b6f72]"> · gastos que pagaron de su bolsa ({money(debt.spent)}), reembolsado {money(debt.repaid)}</span></div>
+          <Btn onClick={() => setEd({ preset: { category: 'Reembolso a socio', amount: Math.round(debt.owed * 100) / 100, iva_included: false, account: 'banco', description: 'Reembolso a Iván' } })}>Registrar reembolso</Btn>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {([['mov', 'Movimientos'], ['flujo', 'Flujo de efectivo'], ['cobrar', 'Por cobrar'], ['iva', 'IVA'], ['rec', 'Recurrentes']] as const).map(([k, l]) => <button key={k} onClick={() => setTab(k)} className={`px-3 py-1.5 rounded-full text-sm ${tab === k ? 'bg-graphite text-white' : 'bg-white border border-sand'}`}>{l}</button>)}
         {tab !== 'cobrar' && tab !== 'rec' && <select className="!w-44 ml-auto" value={month} onChange={e => setMonth(e.target.value)}>{months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}</select>}
@@ -154,7 +162,7 @@ export default function Finance() {
         </Card>
       )}
       {tab === 'rec' && <Recurring />}
-      {ed && <TxForm tx={ed.tx} onClose={() => setEd(null)} />}
+      {ed && <TxForm tx={ed.tx} preset={ed.preset} onClose={() => setEd(null)} />}
     </div>
   )
 }
